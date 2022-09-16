@@ -10,26 +10,36 @@ class MycustomPainter extends CustomPainter {
   @override 
   void paint(Canvas canvas, Size size) {
 
+    print(objects);
+
 
    
-    double width = MediaQuery.of(context).size.width;
+
 
   
 
     for (var o in objects){
-    final Rect rect = Rect.fromPoints(Offset(o.xmin,o.ymin), Offset(o.xmax,o.ymax));
+      o.setSize(newwidth: width, newheight: height);
+     Rect rect = Rect.fromPoints(Offset(o.xmax,o.ymin), Offset(o.xmin,o.ymax));
+    //  Rect rect = Rect.fromCenter(center: Offset(o.xmin,o.ymin), width: o.xmax, height: o.ymax);
+
   
     canvas.drawRect(
       rect,
       Paint()..style=PaintingStyle.stroke ..strokeWidth=3
     );
+    TextSpan span = new TextSpan(style: new TextStyle(color: Colors.black), text: o.clas);
+TextPainter tp = new TextPainter(text: span, textAlign: TextAlign.left, textDirection: TextDirection.ltr);
+tp.layout();
+tp.paint(canvas, Offset(o.xmax-20,o.ymin-20));
 
     }
+    
     
   }
   @override
   bool shouldRepaint(CustomPainter oldPainter){
-    return false;
+    return true;
 
   }
 

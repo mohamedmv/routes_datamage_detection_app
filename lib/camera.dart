@@ -78,37 +78,55 @@ print("++++++++++++++++++++++++");
     print(controller?.value.aspectRatio);
 
 
- if(!context.read<ModelManager>().isRunning){
-          context.read<ModelManager>().realTimeCameraDetection(controller!);
-        }
+
 
     return Consumer<ModelManager>(
 
       builder: (context, modelManager, _){
 
        
-          return SafeArea(
-
-
-         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-            children:[
-       
-               SizedBox(
-              height: MediaQuery.of(context).size.width*controller!.value.aspectRatio,
-              width: MediaQuery.of(context).size.width,
-              child: CustomPaint(
-                painter: MycustomPainter(
-                  context: context,
-                  objects: modelManager.detectedObjects,
-                    height: MediaQuery.of(context).size.width*controller!.value.aspectRatio,
-              width: MediaQuery.of(context).size.width,
-                ),
-                child: CameraPreview(controller!))),
-            ]
+          return Scaffold(
+            body: SafeArea(
           
-           ),
-       );
+          
+                   child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+              children:[
+
+                
+                 
+                 SizedBox(
+                height: MediaQuery.of(context).size.width*controller!.value.aspectRatio,
+                width: MediaQuery.of(context).size.width,
+                child: Stack(
+                  children:[
+                    CameraPreview(controller!),
+                    CustomPaint(
+                    painter: MycustomPainter(
+                      context: context,
+                      objects: modelManager.detectedObjects,
+                        height: MediaQuery.of(context).size.width*controller!.value.aspectRatio,
+                  width: MediaQuery.of(context).size.width,
+                    ),
+                   
+                    ),
+
+                    
+                  ] 
+                )),
+          
+          
+          
+                  TextButton(onPressed: (){
+                    
+            context.read<ModelManager>().realTimeCameraDetection(controller!);
+                  
+                  }, child: Text("take"))
+              ]
+            
+             ),
+                 ),
+          );
       }
      );
   }

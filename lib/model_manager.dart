@@ -4,31 +4,28 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:object_detection/detection_object.dart';
-import 'package:tflite_flutter/tflite_flutter.dart' ;
-import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
+
 
 
 import 'package:image/image.dart' as img;
+import 'package:tflite/tflite.dart';
 class ModelManager extends ChangeNotifier{
 
 
   bool _isRunning=false;
-  bool started = false;
+
 
   int inputSize;
   String modelName;
 
   double confThreshold;
 
-  Map<String ,int> outPutIndexes = {
-    "probs":0,
-    "boxes":1,
-    "classes":3
-  };
 
-  List<DetectionObject> detectedObjects=[];
+  List<DetectionObject> detectedObjects=[
+    DetectionObject(xmin: 0.1, xmax: 0.4, ymin: 0.2, ymax: 0.5, confidence: 0.6, clas: "D00")
+  ];
 
-  ModelManager({required this.inputSize,required this.modelName,this.confThreshold=0.5}){
+  ModelManager({required this.inputSize,required this.modelName,this.confThreshold=0.3}){
     initializeModel();
   }
 
@@ -40,49 +37,66 @@ class ModelManager extends ChangeNotifier{
 
 
 
-Interpreter ?interpreter;
 Future<void> initializeModel() async {
 
 
-              interpreter =await  Interpreter.fromAsset(modelName);
-
-            if(interpreter!=null) print("Model was initialized successfuly");
-
-            notifyListeners();
+          String ?res = await Tflite.loadModel(
+                          model: "assets/"+modelName,
+                          labels: "assets/labels.txt",
+                          numThreads: 1, // defaults to 1
+                          isAsset: true, // defaults to true, set to false to load resources outside assets
+                          useGpuDelegate: false // defaults to false, set to true to use GPU delegate
+                        );
+                        print(res);
 }
 
-void MakePrediction({File ?file,img.Image? image}){
+Future<void> MakePrediction({File ?file,img.Image? image,List<Uint8List>? frame,Uint8List ?bytes,height,width}) async{
 
-              ImageProcessor imageProcessor = ImageProcessorBuilder()
-              .add(ResizeOp(inputSize, inputSize, ResizeMethod.NEAREST_NEIGHBOUR))
-
-              .build();
-              TensorImage tensorImage;
-
-              if(image==null){
-                tensorImage= TensorImage.fromFile(file!);
-              }
-               
-              else{
-                tensorImage = TensorImage.fromImage(image);
-              }
+              
                
 
               
 
             // Preprocess the image.
             // The image for imageFile will be resized to (224, 224)
-            tensorImage = imageProcessor.process(tensorImage);
-            print(tensorImage);
-              var outputs = <int, TensorBuffer>{};
-              outputs[0] = TensorBuffer.createFixedSize(<int>[1, 25], TfLiteType.float32);
-              outputs[1] = TensorBuffer.createFixedSize(<int>[1, 25,4], TfLiteType.float32);
-              outputs[2] = TensorBuffer.createFixedSize(<int>[1], TfLiteType.float32);
-              outputs[3] = TensorBuffer.createFixedSize(<int>[1, 25], TfLiteType.float32);
 
-            interpreter!.runForMultipleInputs([tensorImage.buffer], outputs);
-            print(outputs);
-            getDetection(outputs);
+          var res;
+
+           if(file != null){
+
+             res = await   Tflite.detectObjectOnImage(path: file.path,model: "efficientdet",threshold: confThreshold);
+
+
+
+           }
+           else if (frame!=null){
+
+             res = await   Tflite.detectObjectOnFrame(bytesList: frame, model: "efficientdet",imageHeight: height,imageWidth: width,threshold: confThreshold);
+            print(res.runtimeType);
+            print(res);
+
+
+           }
+
+            if(res !=null){
+
+
+            print(res.runtimeType);
+            print(res);
+            detectedObjects=[];
+            for( var ob in res!){
+
+              // detectedObjects.add(DetectionObject(xmin:  ob['rect']['x'],  xmax:ob['rect']['w'], ymin: ob['rect']['y'], ymax: ob['rect']['h'], confidence: ob["confidenceInClass"], clas: ob['detectedClass']));
+              detectedObjects.add(DetectionObject(xmin: ob['rect']['xmin'],  xmax:ob['rect']['xmax'], ymin: ob['rect']['ymin'], ymax: ob['rect']['ymax'], confidence: ob["confidenceInClass"], clas: ob['detectedClass']));
+            }
+
+            print(detectedObjects);
+            notifyListeners();
+            }
+
+
+
+
 
 
             
@@ -90,51 +104,69 @@ void MakePrediction({File ?file,img.Image? image}){
 
 
 
-  getDetection(Map<int,TensorBuffer> outputs){
+  // getDetection(){
 
 
-    List<double> probs = outputs[outPutIndexes['probs']]!.getDoubleList();
-    print(probs);
+  //   List<double> probs = _probOutPut.getDoubleList();
+  //   print(probs);
 
-    List<double> boxes = outputs[outPutIndexes['boxes']]!.getDoubleList();
+  //   List<double> boxes = _boxesOutPut.getDoubleList();
+  //   print(boxes);
 
-    List<double> classes = outputs[outPutIndexes['classes']]!.getDoubleList();
+  //   List<double> classes = _classesOutPut.getDoubleList();
+  //   print(classes);
 
-    List<DetectionObject> objects = [];
-    for(int i =0; i<probs.length ; i++){
-      if(probs[i] > confThreshold){
+  //   List<DetectionObject> objects = [];
+  //   for(int i =0; i<probs.length ; i++){
+  //     if(probs[i] >= confThreshold){
 
-        objects.add(
-          DetectionObject(ymin: boxes[i*4],xmin: boxes[i*4 +1], ymax: boxes[i*4 +2],xmax: boxes[i*4 +3],  confidence: probs[i], clas: boxes[i].toInt()));
-      }
-    }
+  //       objects.add(
+  //         DetectionObject(ymin: boxes[i*4],xmin: boxes[i*4 +1], ymax: boxes[i*4 +2],xmax: boxes[i*4 +3],  confidence: probs[i], clas: boxes[i].toInt()));
+  //     }
+  //   }
 
-    detectedObjects =  objects;
-    notifyListeners();
+  //   detectedObjects =  objects;
 
-  }
+  //   print(detectedObjects);
+  //   notifyListeners();
+
+  // }
 
 
   realTimeCameraDetection(CameraController controller)async{
 
     await initializeModel();
-    _isRunning=true;
-    notifyListeners();
+    // _isRunning=true;
+    // notifyListeners();
+    
 
-    await controller.startImageStream((cameraImage){
+controller.setFlashMode(FlashMode.off);
+    
+      var f = await controller.takePicture();
 
-      if(_isRunning ){
-            img.Image image = img.Image.fromBytes(cameraImage.width, cameraImage.height, cameraImage.planes[0].bytes);
-      MakePrediction(image: image);
-      _isRunning=false;
+     await  MakePrediction(file: File(f.path));
+
+    // await controller.startImageStream((cameraImage) async{
       
-      notifyListeners();
-      }
 
-
-  
+    //   if(!_isRunning ){
+    //    _isRunning=true;
       
-    });
+    //   notifyListeners();
+      
+    //   var frame =  cameraImage.planes.map((plane) => plane.bytes).toList();
+    //   var width =  cameraImage.width;
+    //   var height = cameraImage.height;
+            
+    // await   MakePrediction(frame:frame,width: width,height: height);
+
+ 
+
+    //   }
+      
+    // });
+
+
 
     
   }
